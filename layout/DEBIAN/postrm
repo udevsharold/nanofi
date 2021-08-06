@@ -1,0 +1,5 @@
+#!/bin/bash
+
+killall -9 terminusd || true
+
+exit 0
