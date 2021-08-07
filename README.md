@@ -9,7 +9,7 @@ It comes with a Control Center module. The module acts as an intermediate switch
 
 ## How to use this tweak?
 
-You’ll have to activate NanoFi via the Control Center module (the switch in Settings.app just act an master switch that will completely disable the tweak) it acts as an indicator of whether we successfully switch to wifi link. If it’s not, the module will automatically revert back to off. It might failed for various reasons, one of it is your Apple Watch not responding (no handshake/ack) to our request for switching. Hence, that’s where the toggle comes in. In the future I might think of it to automatically switch on (after we’ve failed) when it has active packets, depending on whether I decides to work on it.
+You’ll have to activate NanoFi via the CC module (the switch in  Settings.app just act an master switch that will completely disable the tweak) it acts as an indicator of whether we successfully switch to wifi  link. The hourglass indicates we're still trying to make the switch, and will change back to normal glyph when success. If it failed, the module will automatically revert back to off. It might failed for various reasons, one of it is your Apple Watch not responding (no handshake/ack received) to our request for switching. Hence, that’s where the toggle comes in, you could try to turn it back on if you want and the process will repeat. In the future I might think of it to automatically switch on (after we’ve failed) when it has active packets, depending on whether I decides to work on it.
 
 
 
