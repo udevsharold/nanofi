@@ -21,14 +21,21 @@
 
 #define kPrefsChanged @"com.udevs.nanofi.prefschanged"
 #define kExitMain @"com.udevs.nanofi.exitmain"
+#define kSBReloaded @"com.udevs.nanofi.sbreloaded"
 
 #define kAttemptPreferWiFi @"com.udevs.nanofi.attempt-prefer-wifi"
 #define kResetPreferWiFi @"com.udevs.nanofi.reset-prefer-wifi"
 
 #define kPreferWiFiState "com.udevs.nanofi.state"
+#define kPreferWiFiActivity "com.udevs.nanofi.activity"
 
 typedef NS_ENUM(uint64_t, NFPreferWiFiState){
     NFPreferWiFiStateNone,
     NFPreferWiFiStateReset,
     NFPreferWiFiStatePrefer
+};
+
+typedef NS_ENUM(uint64_t, NFPreferWiFiActivity){
+    NFPreferWiFiActivityNone,
+    NFPreferWiFiActivityRequesting
 };

@@ -16,8 +16,10 @@
 #import "NFMNanoFi.h"
 #import "../NFShared.h"
 #include <notify.h>
+#include <objc/runtime.h>
 
 static int prefer_wifi_state_token = 0;
+static int prefer_wifi_activity_token = 0;
 static BOOL shouldSetValue = YES;
 
 @implementation NFMNanoFi
@@ -25,18 +27,29 @@ static BOOL shouldSetValue = YES;
 - (instancetype)init{
     if (self = [super init]){
         _enabled = [valueForKey(@"enabled", @YES) boolValue];
-        uint64_t lastState = [valueForKey(@"lastPreferWiFiState", @(NFPreferWiFiStateNone)) unsignedLongLongValue];
-                
+        NFPreferWiFiState lastAction = [valueForKey(@"lastPreferWiFiAction", @(NFPreferWiFiStateNone)) unsignedLongLongValue];
+
         shouldSetValue = NO;
-        _selected = _enabled && (lastState == NFPreferWiFiStatePrefer);
+        _selected = _enabled && (lastAction == NFPreferWiFiStatePrefer);
         [self setSelected:_selected];
         shouldSetValue = YES;
         
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            if (_enabled){
+                NSArray *controllers = [[self valueForKey:@"_contentViewControllers"] allObjects];
+                if (controllers.count > 0){
+                    CCUIToggleViewController *toggleController = controllers.firstObject;
+                    toggleController.glyphImage = [UIImage imageNamed:@"NanoFi-Requesting" inBundle:[NSBundle bundleForClass:[self class]] compatibleWithTraitCollection:nil];
+                    CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(), (CFStringRef)kSBReloaded, NULL, NULL, YES);
+                }
+            }
+        });
+
         notify_register_dispatch(kPreferWiFiState, &prefer_wifi_state_token, dispatch_get_main_queue(), ^(int token) {
             
-            uint64_t state = UINT64_MAX;
+            NFPreferWiFiState state = UINT64_MAX;
             notify_get_state(token, &state);
-            
+                        
             shouldSetValue = NO;
             _selected = state == NFPreferWiFiStatePrefer;
             [self setSelected:_selected];
@@ -44,9 +57,36 @@ static BOOL shouldSetValue = YES;
             
             setValueForKey(@"lastPreferWiFiState", @(state));
             _requesting = NO;
+            
+            [self updateGlyphNamed:@"NanoFi"];
+        });
+        
+        notify_register_dispatch(kPreferWiFiActivity, &prefer_wifi_activity_token, dispatch_get_main_queue(), ^(int token) {
+            
+            NFPreferWiFiActivity activity = UINT64_MAX;
+            notify_get_state(token, &activity);
+            
+            if (activity == NFPreferWiFiActivityRequesting){
+                [self updateGlyphNamed:@"NanoFi-Requesting"];
+                _requesting = YES;
+            }else{
+                [self updateGlyphNamed:@"NanoFi"];
+                _requesting = NO;
+            }
+            
         });
     }
     return self;
+}
+
+-(void)updateGlyphNamed:(NSString *)name{
+    NSArray *controllers = [[self valueForKey:@"_contentViewControllers"] allObjects];
+    if (controllers.count > 0){
+        if ([controllers.firstObject isKindOfClass:objc_getClass("CCUIToggleViewController")]){
+            CCUIToggleViewController *toggleController = controllers.firstObject;
+            toggleController.glyphImage = [UIImage imageNamed:name inBundle:[NSBundle bundleForClass:[self class]] compatibleWithTraitCollection:nil];
+        }
+    }
 }
 
 - (UIImage *)iconGlyph{
@@ -76,6 +116,7 @@ static BOOL shouldSetValue = YES;
         CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(), (CFStringRef)kResetPreferWiFi, NULL, NULL, YES);
         setValueForKey(@"lastPreferWiFiAction", @(NFPreferWiFiStateReset));
     }
+    [self updateGlyphNamed:@"NanoFi-Requesting"];
     _requesting = YES;
 }
 

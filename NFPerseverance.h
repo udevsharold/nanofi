@@ -12,6 +12,7 @@
 //    You should have received a copy of the GNU General Public License
 //    along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+#import "common.h"
 #import "NFPerseverance.h"
 #include <xpc/xpc.h>
 
@@ -29,7 +30,8 @@
     NSUInteger _attemptCount;
     NSUInteger _resetCount;
     BOOL _enabled;
-    NSUInteger _latestRequest;
+    NFPreferWiFiState _latestRequest;
+    NFPreferWiFiState _lastState;
 }
 +(xpc_object_t)criteriaWithInterval:(int64_t)interval;
 +(instancetype)sharedInstance;

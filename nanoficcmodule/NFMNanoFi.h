@@ -1,10 +1,9 @@
-#import <ControlCenterUIKit/CCUIToggleModule.h>
+#include <ControlCenterUIKit/CCUIToggleModule.h>
+#include <ControlCenterUIKit/CCUIToggleViewController.h>
 
-@interface NFMNanoFi : CCUIToggleModule
-{
+@interface NFMNanoFi : CCUIToggleModule{
     BOOL _selected;
     BOOL _enabled;
     BOOL _requesting;
 }
-
 @end

@@ -24,18 +24,14 @@ static void ExitMain(){
 %hook NRLinkWiFi
 - (void)setIsPrimary:(BOOL)primary{
     %orig;
-    if (!primary){
-        [[NSNotificationCenter defaultCenter] postNotificationName:@"PrimaryLinkChangedNotification" object:self];
-    }
+    [[NSNotificationCenter defaultCenter] postNotificationName:@"PrimaryLinkChangedNotification" object:self];
 }
 %end
 
 %hook NRLinkManagerWiFi
 - (void)setIsWiFiAvailable:(BOOL)available{
     %orig;
-    if (available){
-        [[NSNotificationCenter defaultCenter] postNotificationName:@"WiFiLinkChangedNotification" object:self];
-    }
+    [[NSNotificationCenter defaultCenter] postNotificationName:@"WiFiLinkChangedNotification" object:self];
 }
 %end
 
@@ -45,10 +41,14 @@ static void ExitMain(){
     //we need to run this in the correct queue
     dispatch_async(dispatch_get_main_queue(), ^{
         BOOL enabled = [valueForKey(@"enabled", @YES) boolValue];
-        uint64_t lastAction = [valueForKey(@"lastPreferWiFiAction", @(NFPreferWiFiStateNone)) unsignedLongLongValue];
+        NFPreferWiFiState lastAction = [valueForKey(@"lastPreferWiFiAction", @(NFPreferWiFiStateNone)) unsignedLongLongValue];
+        NFPerseverance *perseverance = [NFPerseverance sharedInstance];
         if (enabled && (lastAction == NFPreferWiFiStatePrefer)){
-            [[NFPerseverance sharedInstance] setValue:@(NFPreferWiFiStatePrefer) forKey:@"_latestRequest"];
-            [[NFPerseverance sharedInstance] beginPreferWiFiRequestWithInterval:XPC_ACTIVITY_INTERVAL_1_MIN queue:self.queue];
+            [perseverance setValue:@(NFPreferWiFiStatePrefer) forKey:@"_latestRequest"];
+            [perseverance beginPreferWiFiRequestWithInterval:XPC_ACTIVITY_INTERVAL_1_MIN queue:self.queue];
+            [perseverance notify:kPreferWiFiActivity state:NFPreferWiFiActivityRequesting];
+        }else{
+            [perseverance notify:kPreferWiFiActivity state:NFPreferWiFiActivityNone];
         }
     });
     return self;

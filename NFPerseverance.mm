@@ -42,6 +42,12 @@ static void PrefsChanged(){
     }
 }
 
+static void SBReloaded(){
+    if (instanceCreated){
+        [[NFPerseverance sharedInstance] updateModule];
+    }
+}
+
 +(xpc_object_t)bareCriteria{
     xpc_object_t criteria = xpc_dictionary_create(NULL, NULL, 0);
     xpc_dictionary_set_bool(criteria, XPC_ACTIVITY_REPEATING, YES);
@@ -73,7 +79,8 @@ static void PrefsChanged(){
         _activityResetPreferWiFiName = @"com.udevs.nanofi.resetpreferwifi-activity";
         _desiredAttemptCount = 10;
         _desiredResetCount = 10;
-
+        _lastState = NFPreferWiFiStateNone;
+        
         _activityPreferWiFiHandler = dispatch_block_create(static_cast<dispatch_block_flags_t>(0), ^{
             
             if (_latestRequest != NFPreferWiFiStatePrefer) return;
@@ -119,7 +126,7 @@ static void PrefsChanged(){
                 HBLogDebug(@"Stop attempting since we're in the middle of something");
             }
             
-            HBLogDebug(@"Attempting prefer WiFi link #%llu", _attemptCount);
+            HBLogDebug(@"Attempting prefer WiFi link #%lu", _attemptCount);
             
             if (_attemptCount > _desiredAttemptCount){
                 [self stopPreferWiFiRequestActivity];
@@ -155,7 +162,7 @@ static void PrefsChanged(){
                 HBLogDebug(@"Stop resetting since we're in the middle of something");
             }
             
-            HBLogDebug(@"Resetting prefer WiFi link #%llu", _attemptCount);
+            HBLogDebug(@"Resetting prefer WiFi link #%lu", _attemptCount);
             
             if (_resetCount > _desiredResetCount){
                 [self stopResetPreferWiFiRequestActivity];
@@ -171,6 +178,8 @@ static void PrefsChanged(){
         CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), NULL, (CFNotificationCallback)AttemptPreferWiFi, (CFStringRef)kAttemptPreferWiFi, NULL, CFNotificationSuspensionBehaviorDeliverImmediately);
         CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), NULL, (CFNotificationCallback)ResetPreferWiFi, (CFStringRef)kResetPreferWiFi, NULL, CFNotificationSuspensionBehaviorDeliverImmediately);
         CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), NULL, (CFNotificationCallback)PrefsChanged, (CFStringRef)kPrefsChanged, NULL, CFNotificationSuspensionBehaviorDeliverImmediately);
+        CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), NULL, (CFNotificationCallback)SBReloaded, (CFStringRef)kSBReloaded, NULL, CFNotificationSuspensionBehaviorDeliverImmediately);
+
     }
     return self;
 }
@@ -183,6 +192,16 @@ static void PrefsChanged(){
     }
 }
 
+-(void)updateModule{
+    if (!_preferWiFiRequestScheduled && !_resetPreferWiFiRequestScheduled){
+        [self notify:kPreferWiFiState state:_lastState];
+    }else if (_preferWiFiRequestScheduled){
+        [self notify:kPreferWiFiActivity state:NFPreferWiFiActivityRequesting];
+    }else if (_resetPreferWiFiRequestScheduled){
+        [self notify:kPreferWiFiActivity state:NFPreferWiFiActivityNone];
+    }
+}
+
 -(void)notify:(const char *)notificationName state:(uint64_t)state{
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
         int token = 0;
@@ -191,32 +210,55 @@ static void PrefsChanged(){
         notify_cancel(token);
         notify_post(notificationName);
     });
+    _lastState = state;
 }
 
 -(void)wifiChanged:(NSNotification *)notification{
+    NFPreferWiFiState lastAction = [valueForKey(@"lastPreferWiFiAction", @(NFPreferWiFiStateNone)) unsignedLongLongValue];
+
     NRLinkDirector *director = [objc_getClass("NRLinkDirector") copySharedLinkDirector];
     
     if (!director.wifiManager.isWiFiAvailable){
         [self stopPreferWiFiRequestActivity];
+        [self stopResetPreferWiFiRequestActivity];
+        [self notify:kPreferWiFiState state:NFPreferWiFiStateNone];
         return;
+    }else if (lastAction == NFPreferWiFiStatePrefer){
+        dispatch_async(director.queue, ^{
+            for (NRDDeviceConductor *conductor in director.conductors.allValues){
+                if (![[conductor copyPrimaryLink] isKindOfClass:objc_getClass("NRLinkWiFi")]){
+                    if (_latestRequest == NFPreferWiFiStateReset) return;
+                    if (_preferWiFiRequestScheduled) return;
+                    HBLogDebug(@"WiFi link available, restarting activity");
+                    [self beginPreferWiFiRequestWithInterval:XPC_ACTIVITY_INTERVAL_1_MIN queue:director.queue];
+                    break;
+                }else{
+                    [self notify:kPreferWiFiState state:NFPreferWiFiStatePrefer];
+                }
+            }
+        });
     }
 }
 
 -(void)primaryLinkChanged:(NSNotification *)notification{
     
+    NFPreferWiFiState lastAction = [valueForKey(@"lastPreferWiFiAction", @(NFPreferWiFiStateNone)) unsignedLongLongValue];
+    
     NRLinkDirector *director = [objc_getClass("NRLinkDirector") copySharedLinkDirector];
     
-    dispatch_async(director.queue, ^{
-        for (NRDDeviceConductor *conductor in director.conductors.allValues){
-            if (![[conductor copyPrimaryLink] isKindOfClass:objc_getClass("NRLinkWiFi")]){
-                if (_latestRequest == NFPreferWiFiStateReset) return;
-                if (_preferWiFiRequestScheduled) return;
-                HBLogDebug(@"Primary link changed, restarting activity");
-                [self beginPreferWiFiRequestWithInterval:XPC_ACTIVITY_INTERVAL_1_MIN queue:director.queue];
-                break;
+    if (lastAction == NFPreferWiFiStatePrefer && director.wifiManager.isWiFiAvailable){
+        dispatch_async(director.queue, ^{
+            for (NRDDeviceConductor *conductor in director.conductors.allValues){
+                if (![[conductor copyPrimaryLink] isKindOfClass:objc_getClass("NRLinkWiFi")]){
+                    if (_latestRequest == NFPreferWiFiStateReset) return;
+                    if (_preferWiFiRequestScheduled) return;
+                    HBLogDebug(@"Primary link changed, restarting activity");
+                    [self beginPreferWiFiRequestWithInterval:XPC_ACTIVITY_INTERVAL_1_MIN queue:director.queue];
+                    break;
+                }
             }
-        }
-    });
+        });
+    }
 }
 
 -(void)resetPreferWiFi{
@@ -266,17 +308,18 @@ static void PrefsChanged(){
 
 -(void)stopActivity:(NSString *)activityName{
     xpc_activity_unregister(activityName.UTF8String);
-    _attemptCount = 0;
     HBLogDebug(@"🟠🕑 Activity unscheduled: %@", activityName);
 }
 
 -(void)stopPreferWiFiRequestActivity{
     [self stopActivity:_activityPreferWiFiName];
     _preferWiFiRequestScheduled = NO;
+    _attemptCount = 0;
 }
 
 -(void)stopResetPreferWiFiRequestActivity{
     [self stopActivity:_activityResetPreferWiFiName];
     _resetPreferWiFiRequestScheduled = NO;
+    _resetCount = 0;
 }
 @end
