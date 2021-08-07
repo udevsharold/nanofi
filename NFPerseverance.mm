@@ -77,8 +77,8 @@ static void SBReloaded(){
     if (self = [super init]){
         _activityPreferWiFiName = @"com.udevs.nanofi.preferwifi-activity";
         _activityResetPreferWiFiName = @"com.udevs.nanofi.resetpreferwifi-activity";
-        _desiredAttemptCount = 1;
-        _desiredResetCount = 1;
+        _desiredAttemptCount = 10;
+        _desiredResetCount = 10;
         _lastState = NFPreferWiFiStateNone;
         
         _activityPreferWiFiHandler = dispatch_block_create(static_cast<dispatch_block_flags_t>(0), ^{
