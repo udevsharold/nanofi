@@ -37,5 +37,6 @@ typedef NS_ENUM(uint64_t, NFPreferWiFiState){
 
 typedef NS_ENUM(uint64_t, NFPreferWiFiActivity){
     NFPreferWiFiActivityNone,
-    NFPreferWiFiActivityRequesting
+    NFPreferWiFiActivityRequesting,
+    NFPreferWiFiActivityFailed
 };

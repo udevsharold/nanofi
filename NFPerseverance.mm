@@ -77,8 +77,8 @@ static void SBReloaded(){
     if (self = [super init]){
         _activityPreferWiFiName = @"com.udevs.nanofi.preferwifi-activity";
         _activityResetPreferWiFiName = @"com.udevs.nanofi.resetpreferwifi-activity";
-        _desiredAttemptCount = 10;
-        _desiredResetCount = 10;
+        _desiredAttemptCount = 1;
+        _desiredResetCount = 1;
         _lastState = NFPreferWiFiStateNone;
         
         _activityPreferWiFiHandler = dispatch_block_create(static_cast<dispatch_block_flags_t>(0), ^{
@@ -100,20 +100,25 @@ static void SBReloaded(){
                     HBLogDebug(@"✅ We got it. Primary link is WiFi, stop activity");
                     [self stopPreferWiFiRequestActivity];
                     [self notify:kPreferWiFiState state:NFPreferWiFiStatePrefer];
+                    [self notify:kPreferWiFiActivity state:NFPreferWiFiActivityNone];
                     return;
                 }
                 
                 if (conductor.hasPhoneCallRelayRequest){
                     HBLogDebug(@"We have phone relay request, stop activity");
                     [self stopPreferWiFiRequestActivity];
+                    [self notify:kPreferWiFiState state:NFPreferWiFiStateNone];
+                    [self notify:kPreferWiFiActivity state:NFPreferWiFiActivityFailed];
                     return;
                 }
                 
                 NRLink *wifiLink = [conductor copyLinkOfType:2];
                 if (!wifiLink || wifiLink.state == 255){
                     HBLogDebug(@"No valid WiFi link, stop activity");
+                    [director preferWiFiRequestAvailable];
                     [self stopPreferWiFiRequestActivity];
-                    //return; //We still can enqueue the request
+                    [self notify:kPreferWiFiActivity state:NFPreferWiFiActivityNone];
+                    return;
                 }
             }
             
@@ -123,6 +128,7 @@ static void SBReloaded(){
             if (!success){
                 [self stopPreferWiFiRequestActivity];
                 [self notify:kPreferWiFiState state:NFPreferWiFiStateNone];
+                [self notify:kPreferWiFiActivity state:NFPreferWiFiActivityFailed];
                 HBLogDebug(@"Stop attempting since we're in the middle of something");
             }
             
@@ -131,9 +137,10 @@ static void SBReloaded(){
             if (_attemptCount > _desiredAttemptCount){
                 [self stopPreferWiFiRequestActivity];
                 [self notify:kPreferWiFiState state:NFPreferWiFiStateNone];
+                [self notify:kPreferWiFiActivity state:NFPreferWiFiActivityFailed];
                 HBLogDebug(@"Exceeded desired attempt counts, stop activity");
             }
-            
+
         });
         
         _activityResetPreferWiFiHandler = dispatch_block_create(static_cast<dispatch_block_flags_t>(0), ^{
@@ -149,6 +156,7 @@ static void SBReloaded(){
                     HBLogDebug(@"✅ We got it. Primary link is no longer WiFi, stop activity");
                     [self stopResetPreferWiFiRequestActivity];
                     [self notify:kPreferWiFiState state:NFPreferWiFiStateReset];
+                    [self notify:kPreferWiFiActivity state:NFPreferWiFiActivityNone];
                     return;
                 }
             }
@@ -159,6 +167,7 @@ static void SBReloaded(){
             if (!success){
                 [self stopResetPreferWiFiRequestActivity];
                 [self notify:kPreferWiFiState state:NFPreferWiFiStateNone];
+                [self notify:kPreferWiFiActivity state:NFPreferWiFiActivityFailed];
                 HBLogDebug(@"Stop resetting since we're in the middle of something");
             }
             
@@ -167,6 +176,7 @@ static void SBReloaded(){
             if (_resetCount > _desiredResetCount){
                 [self stopResetPreferWiFiRequestActivity];
                 [self notify:kPreferWiFiState state:NFPreferWiFiStateNone];
+                [self notify:kPreferWiFiActivity state:NFPreferWiFiActivityFailed];
                 HBLogDebug(@"Exceeded desired reset counts, stop activity");
             }
             
@@ -210,7 +220,7 @@ static void SBReloaded(){
         notify_cancel(token);
         notify_post(notificationName);
     });
-    _lastState = state;
+    if (strcmp(notificationName, kPreferWiFiState) == 0) _lastState = state;
 }
 
 -(void)wifiChanged:(NSNotification *)notification{
@@ -231,6 +241,8 @@ static void SBReloaded(){
                     if (_preferWiFiRequestScheduled) return;
                     HBLogDebug(@"WiFi link available, restarting activity");
                     [self beginPreferWiFiRequestWithInterval:XPC_ACTIVITY_INTERVAL_1_MIN queue:director.queue];
+                    [self notify:kPreferWiFiState state:NFPreferWiFiStatePrefer];
+                    [self notify:kPreferWiFiActivity state:NFPreferWiFiActivityRequesting];
                     break;
                 }else{
                     [self notify:kPreferWiFiState state:NFPreferWiFiStatePrefer];

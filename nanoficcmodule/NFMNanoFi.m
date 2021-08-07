@@ -66,14 +66,23 @@ static BOOL shouldSetValue = YES;
             NFPreferWiFiActivity activity = UINT64_MAX;
             notify_get_state(token, &activity);
             
-            if (activity == NFPreferWiFiActivityRequesting){
-                [self updateGlyphNamed:@"NanoFi-Requesting"];
-                _requesting = YES;
-            }else{
-                [self updateGlyphNamed:@"NanoFi"];
-                _requesting = NO;
+            switch (activity) {
+                case NFPreferWiFiActivityRequesting:{
+                    [self updateGlyphNamed:@"NanoFi-Requesting"];
+                    _requesting = YES;
+                    break;
+                }
+                case NFPreferWiFiActivityFailed:{
+                    [self updateGlyphNamed:@"NanoFi-RequestingFailed"];
+                    _requesting = NO;
+                    break;
+                }
+                default:{
+                    [self updateGlyphNamed:@"NanoFi"];
+                    _requesting = NO;
+                    break;
+                }
             }
-            
         });
     }
     return self;
@@ -82,9 +91,12 @@ static BOOL shouldSetValue = YES;
 -(void)updateGlyphNamed:(NSString *)name{
     NSArray *controllers = [[self valueForKey:@"_contentViewControllers"] allObjects];
     if (controllers.count > 0){
-        if ([controllers.firstObject isKindOfClass:objc_getClass("CCUIToggleViewController")]){
-            CCUIToggleViewController *toggleController = controllers.firstObject;
-            toggleController.glyphImage = [UIImage imageNamed:name inBundle:[NSBundle bundleForClass:[self class]] compatibleWithTraitCollection:nil];
+        for (id controller in controllers){
+            if ([controller isKindOfClass:objc_getClass("CCUIToggleViewController")]){
+                CCUIToggleViewController *toggleController = controller;
+                toggleController.glyphImage = [UIImage imageNamed:name inBundle:[NSBundle bundleForClass:[self class]] compatibleWithTraitCollection:nil];
+                break;
+            }
         }
     }
 }
