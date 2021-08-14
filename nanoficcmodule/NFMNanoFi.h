@@ -7,3 +7,7 @@
     BOOL _requesting;
 }
 @end
+
+@interface UIApplication ()
+-(BOOL)_openURL:(id)arg1 ;
+@end

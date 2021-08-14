@@ -24,6 +24,10 @@ static BOOL shouldSetValue = YES;
 
 @implementation NFMNanoFi
 
+static void PrefsChanged(){
+    [[NSNotificationCenter defaultCenter] postNotificationName:@"PrefsChanged" object:nil];
+}
+
 - (instancetype)init{
     if (self = [super init]){
         _enabled = [valueForKey(@"enabled", @YES) boolValue];
@@ -84,8 +88,14 @@ static BOOL shouldSetValue = YES;
                 }
             }
         });
+        CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), NULL, (CFNotificationCallback)PrefsChanged, (CFStringRef)kPrefsChanged, NULL, CFNotificationSuspensionBehaviorDeliverImmediately);
+        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(updatePrefs:) name:@"PrefsChanged" object:nil];
     }
     return self;
+}
+
+-(void)updatePrefs:(NSNotification *)notification{
+    _enabled = [valueForKey(@"enabled", @YES) boolValue];
 }
 
 -(void)updateGlyphNamed:(NSString *)name{
@@ -114,7 +124,11 @@ static BOOL shouldSetValue = YES;
 }
 
 - (void)setSelected:(BOOL)selected{
-    if (!_enabled) return;
+    if (!_enabled && selected && shouldSetValue){
+        [[UIApplication sharedApplication] _openURL:[NSURL URLWithString:@"prefs:root=NanoFi"]];
+        return;
+    }
+    
     _selected = selected;
     
     [super refreshState];
