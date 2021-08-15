@@ -40,15 +40,11 @@ static void PrefsChanged(){
         
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
             if (_enabled){
-                NSArray *controllers = [[self valueForKey:@"_contentViewControllers"] allObjects];
-                if (controllers.count > 0){
-                    CCUIToggleViewController *toggleController = controllers.firstObject;
-                    toggleController.glyphImage = [UIImage imageNamed:@"NanoFi-Requesting" inBundle:[NSBundle bundleForClass:[self class]] compatibleWithTraitCollection:nil];
-                    CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(), (CFStringRef)kSBReloaded, NULL, NULL, YES);
-                }
+                [self updateGlyphNamed:@"NanoFi-Requesting"];
+                CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(), (CFStringRef)kSBReloaded, NULL, NULL, YES);
             }
         });
-
+        
         notify_register_dispatch(kPreferWiFiState, &prefer_wifi_state_token, dispatch_get_main_queue(), ^(int token) {
             
             NFPreferWiFiState state = UINT64_MAX;

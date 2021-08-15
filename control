@@ -1,6 +1,6 @@
 Package: com.udevs.nanofi
 Name: NanoFi
-Version: 1.0.4
+Version: 1.0.5
 Architecture: iphoneos-arm
 Description: Make Apple Watch data transfer rate go brrrrrrrr
 Maintainer: udevs
